@@ -10,10 +10,12 @@ To add a repository: add its URL here and commit. Its releases must carry
 assets named `NAME-VERSION-REL-x86_64.pkg.tar.gz` (one repository may ship
 several packages) and, when packages are signed, `….pkg.tar.gz.sig`.
 
-Optional: sign the list itself so that a changed file is refused
-(`registry.conf.sig` next to it is checked when present):
-
-    python3 mk/pkg/pkgsign.py sign ~/.config/purec-pkg/signing.pem registry.conf registry.conf.sig
+`registry.conf` and `repository.conf` are signed by `publish.py`: the last line
+`#sig HEX` holds the ECDSA signature of everything above it, so the file and its
+signature always travel together (the CDN of raw.githubusercontent.com caches a
+file for five minutes, a separate `.sig` file could come from an older copy).
+A changed file is refused. Files without `#sig` fall back to `NAME.sig` next to
+them.
 
 ## repository.conf and bin/
 
@@ -29,8 +31,8 @@ signature:
     bin/NAME/NAME-VERSION-REL-x86_64.pkg.tar.gz
     bin/NAME/NAME-VERSION-REL-x86_64.pkg.tar.gz.sig
 
-`pkg -Sy` downloads `repository.conf` (and `repository.conf.sig` when it
-exists), `pkg -S NAME` downloads the archive and the `.sig` from the listed
+`pkg -Sy` downloads `repository.conf` (the signature is its last line),
+`pkg -S NAME` downloads the archive and the `.sig` from the listed
 path and checks the signature with the keys from `/etc/pkg/keys`. A name that
 appears both here and in a release of a repository from `registry.conf` is
 taken from here. Without `repository.conf` nothing changes.

@@ -35,6 +35,14 @@ that does not match its signature is refused.
 | `login` | Graphical login screen |
 | `terminal` | Terminal emulator |
 | `settings` | System settings |
+| `vim` | Vi IMproved text editor |
+| `git` | Distributed version control (https through curl and wolfSSL) |
+| `curl` | URL transfer tool (wolfSSL) |
+| `wolfssl` | wolfSSL TLS library (development files) |
+| `tcc` | Tiny C compiler with its runtime and headers |
+| `make` | GNU make |
+| `lua` | Lua scripting language |
+| `micropython` | Python for small systems |
 
 ## Testing a change locally
 

@@ -37,7 +37,6 @@ that does not match its signature is refused.
 | `settings` | System settings |
 | `vim` | Vi IMproved text editor |
 | `git` | Distributed version control (https through curl and wolfSSL) |
-| `curl` | URL transfer tool (wolfSSL) |
 | `wolfssl` | wolfSSL TLS library (development files) |
 | `tcc` | Tiny C compiler with its runtime and headers |
 | `make` | GNU make |

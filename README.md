@@ -28,6 +28,7 @@ that does not match its signature is refused.
 
 | Package | Description |
 |---|---|
+| `kernel` | The PureC OS kernel and its modules (releases of PureC-OS/PureC-OS) |
 | `pkg` | The package manager itself |
 | `video-backend` | Display server `videod` and its client library |
 | `libgui` | GUI toolkit on top of videod (static library and headers) |

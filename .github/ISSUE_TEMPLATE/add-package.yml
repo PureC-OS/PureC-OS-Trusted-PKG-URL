@@ -1,0 +1,52 @@
+name: Add or update a package
+description: Ask to list a package in the PureC OS registry
+title: "[package] NAME VERSION"
+labels: ["package"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Packages in this registry are installed by `pkg` on every PureC OS machine,
+        so each one is checked before it is listed. Read CONTRIBUTING.md first.
+  - type: input
+    id: name
+    attributes:
+      label: Package name and version
+      placeholder: terminal 2.0.0-1
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source repository (GitHub URL)
+      placeholder: https://github.com/OWNER/REPO
+    validations:
+      required: true
+  - type: input
+    id: archive
+    attributes:
+      label: Archive (release asset or attached file)
+      description: Must be named NAME-VERSION-REL-x86_64.pkg.tar.gz (or -any for data-only packages)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What the package does and what it depends on
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Requirements
+      options:
+        - label: The archive has a signature NAME-VERSION-REL-x86_64.pkg.tar.gz.sig made with the PureC OS signing key
+          required: true
+        - label: Built for PureC OS x86_64 with the PureC toolchain (x86_64-elf, PureC libc), not a Linux binary
+          required: true
+        - label: .PKGINFO has pkgname, pkgver, pkgdesc, arch and every depend
+          required: true
+        - label: Installs only under usr/ (and usr/lib/init/system for units); does not overwrite files of other packages
+          required: true
+        - label: Tested on PureC OS (pkg -U on a running system)
+          required: true

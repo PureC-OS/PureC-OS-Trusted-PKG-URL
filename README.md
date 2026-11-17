@@ -1,46 +1,59 @@
-# PureC-OS-Trusted-PKG-URL
+# PureC OS package registry
 
-The package registry of PureC OS. `registry.conf` lists the official
-repositories, one GitHub URL per line; `pkg -Sy` downloads it
-(`Registry = https://github.com/PureC-OS/PureC-OS-Trusted-PKG-URL` in
-`/etc/pkg/pkg.conf`) and trusts only the packages from the releases of these
-repositories.
+The list of packages that `pkg`, the PureC OS package manager, trusts.
 
-To add a repository: add its URL here and commit. Its releases must carry
-assets named `NAME-VERSION-REL-x86_64.pkg.tar.gz` (one repository may ship
-several packages) and, when packages are signed, `….pkg.tar.gz.sig`.
+Installed systems point at this repository in `/etc/pkg/pkg.conf`:
 
-`registry.conf` and `repository.conf` are signed by `publish.py`: the last line
-`#sig HEX` holds the ECDSA signature of everything above it, so the file and its
-signature always travel together (the CDN of raw.githubusercontent.com caches a
-file for five minutes, a separate `.sig` file could come from an older copy).
-A changed file is refused. Files without `#sig` fall back to `NAME.sig` next to
-them.
+    [options]
+    Registry = https://github.com/PureC-OS/PureC-OS-Trusted-PKG-URL
 
-## repository.conf and bin/
+`pkg -Sy` downloads `registry.conf` and `repository.conf` from here, checks
+their signatures, and `pkg -S NAME` installs a package only if one of them
+lists it.
 
-Besides the releases of other repositories this repository can hold packages
-itself. `repository.conf` lists them, one per line: the package name, the path
-of its archive relative to the file and an optional description.
+## Files
 
-    tpkg bin/tpkg/tpkg-1.2-1-x86_64.pkg.tar.gz Test package
+| File | What it holds |
+|---|---|
+| `registry.conf` | Official repositories, one GitHub URL per line. Packages come from the assets of their releases. |
+| `repository.conf` | Packages stored in this repository: `NAME PATH DESCRIPTION`, the path is relative to the file. A name listed here wins over a release. |
+| `bin/NAME/` | The archive `NAME-VERSION-REL-x86_64.pkg.tar.gz` and its signature `.sig`. |
 
-Every package lives in its own folder with two files, the archive and its
-signature:
+Both `.conf` files end with `#sig HEX`, the ECDSA signature of everything above
+it. The file and its signature travel together, so the five-minute cache of
+raw.githubusercontent.com never pairs a new file with an old signature. A file
+that does not match its signature is refused.
 
-    bin/NAME/NAME-VERSION-REL-x86_64.pkg.tar.gz
-    bin/NAME/NAME-VERSION-REL-x86_64.pkg.tar.gz.sig
+## Packages
 
-`pkg -Sy` downloads `repository.conf` (the signature is its last line),
-`pkg -S NAME` downloads the archive and the `.sig` from the listed
-path and checks the signature with the keys from `/etc/pkg/keys`. A name that
-appears both here and in a release of a repository from `registry.conf` is
-taken from here. Without `repository.conf` nothing changes.
+| Package | Description |
+|---|---|
+| `pkg` | The package manager itself |
+| `video-backend` | Display server `videod` and its client library |
+| `libgui` | GUI toolkit on top of videod (static library and headers) |
+| `userspace` | Desktop: panels, start menu, applications |
+| `login` | Graphical login screen |
+| `terminal` | Terminal emulator |
+| `settings` | System settings |
 
-To publish packages from the PureC OS tree:
+## Testing a change locally
 
-    python3 mk/pkg/publish.py --registry Trusted bin/repo/NAME-VERSION-REL-x86_64.pkg.tar.gz
+Serve this folder and point a test config at it:
 
-It copies the archive and its `.sig` into `bin/NAME/`, replaces the older
-version in that folder and rewrites the line in `repository.conf`
-(`--keep N` keeps N versions). Commit and push `Trusted` afterwards.
+    python3 -m http.server 8099 --bind HOST_IP        # on the build machine
+
+    [options]                                         # /root/pkg.conf on PureC OS
+    Architecture = x86_64
+    SigLevel = Required
+    Registry = http://HOST_IP:8099/registry.conf
+
+    pkg --config /root/pkg.conf -Sy
+
+## Contributing
+
+Packages must be signed and built for PureC OS x86_64. See
+[CONTRIBUTING.md](CONTRIBUTING.md) and the issue template.
+
+## License
+
+See [LICENSE](LICENSE).

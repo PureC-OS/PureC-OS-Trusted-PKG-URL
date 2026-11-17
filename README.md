@@ -59,7 +59,8 @@ Serve this folder and point a test config at it:
 ## Contributing
 
 Packages must be signed and built for PureC OS x86_64. See
-[CONTRIBUTING.md](CONTRIBUTING.md) and the issue template.
+[CONTRIBUTING.md](CONTRIBUTING.md) and the issue template. AI agents follow
+[AGENTS.md](AGENTS.md) (Claude Code also reads [CLAUDE.md](CLAUDE.md)).
 
 ## License
 

@@ -3,6 +3,33 @@
 This repository decides what `pkg` trusts. Every package listed here is
 installed on PureC OS machines with root rights, so the rules are strict.
 
+If you are an AI agent, also read [AGENTS.md](AGENTS.md).
+
+## Contents
+
+- [Ways to contribute](#ways-to-contribute)
+- [Requirements for a package](#requirements-for-a-package)
+- [Building a package](#building-a-package)
+- [Signing](#signing)
+- [How a package gets in](#how-a-package-gets-in)
+- [Updating and removing packages](#updating-and-removing-packages)
+- [Testing](#testing)
+- [Checklist before a pull request](#checklist-before-a-pull-request)
+- [Commits and pull requests](#commits-and-pull-requests)
+- [Review](#review)
+- [Security](#security)
+
+## Ways to contribute
+
+- **Propose a package.** Open an issue with the "Add or update a package"
+  template. You do not need the signing key: a maintainer checks the archive,
+  signs it and lists it.
+- **Update a package.** Same template, with the new version and what changed.
+- **Report a broken package.** Open an issue with the package name, version,
+  the `pkg` command and its full output.
+- **Improve the docs** (README, this file, AGENTS.md, the issue template).
+  Pull requests are welcome and do not touch the signed files.
+
 ## Requirements for a package
 
 1. **Signed.** Next to every archive lies its signature
@@ -20,25 +47,167 @@ installed on PureC OS machines with root rights, so the rules are strict.
 5. **Tested.** Installed with `pkg -U` on a running PureC OS before it is
    listed.
 
+### Names and versions
+
+- `NAME`: lowercase letters, digits and `.`, `_`, `+`, `-`. It says what the
+  package is, not how it was made: no `qt-` prefix for a program that no longer
+  uses Qt, no `purec-` prefix (everything here is for PureC OS).
+- `VERSION`: the upstream version (`9.2`, `2.56.1`), or your own semantic
+  version for PureC OS programs (`MAJOR.MINOR.PATCH`).
+- `REL`: the package release, starting at `1`. Raise it when the package
+  changes but the program does not (new build flags, a fixed file list, a new
+  unit). Reset it to `1` with a new `VERSION`.
+- `ARCH`: `x86_64` for anything with machine code, `any` for data only (fonts,
+  icons, wallpapers, docs).
+
+### Dependencies and conflicts
+
+- Declare every package whose files you need at run time with `depend`.
+  Static libraries linked into your binary are not run-time dependencies.
+- When you rename a package, the new one declares `conflict` with the old name,
+  and the old name is removed from the registry in the same change.
+- Two packages never ship the same path. If they must, they conflict.
+
+### Configuration files and hooks
+
+- Files under `etc/` that users may edit are listed with `--backup`; `pkg`
+  keeps the user's copy on upgrade.
+- Hooks (`post-install`, `post-upgrade`, `pre-remove`, `post-remove`) are short
+  shell scripts for PureC OS `sh`. They must be idempotent, must not download
+  anything and must not touch files of other packages.
+
+## Building a package
+
+Packages are made with `mk/pkg/mkpkg.py` from the PureC OS tree:
+
+    python3 mk/pkg/mkpkg.py \
+        --name hello --version 1.0.0-1 --arch x86_64 \
+        --desc "Example program" \
+        --depend libgui \
+        --file usr/bin/hello=build/hello \
+        --tree usr/share/hello=assets/hello \
+        -o out/
+
+`--version` takes `VERSION-REL`. Other options: `--conflict NAME`,
+`--backup etc/FILE`, `--link DEST=TARGET`, `--hook post-install=FILE`.
+
+Check the result before going further:
+
+    tar -tzf out/hello-1.0.0-1-x86_64.pkg.tar.gz       # file list, only usr/
+    tar -xzOf out/hello-1.0.0-1-x86_64.pkg.tar.gz .PKGINFO
+
+Make sure the binaries are PureC OS binaries (static, linked with
+`linker-userspace.ld`), and that every symbol they need resolved at link time.
+
+## Signing
+
+Only maintainers hold the private key. A maintainer signs with
+
+    python3 mk/pkg/pkgsign.py sign ~/.config/purec-pkg/signing.pem \
+        out/hello-1.0.0-1-x86_64.pkg.tar.gz out/hello-1.0.0-1-x86_64.pkg.tar.gz.sig
+
+Installed systems trust the public keys in `/etc/pkg/keys/`
+(`rootfs/etc/pkg/keys/purec.pub` in the PureC OS tree). A signature made with
+another key is refused.
+
+`registry.conf` and `repository.conf` carry their own signature on the last
+line (`#sig HEX`), over every byte above it. Any change to these files, even
+whitespace, needs a new signature; `publish.py` does it.
+
 ## How a package gets in
 
 - **From a release:** add the GitHub URL of your repository to
   `registry.conf`; its releases carry the archive and the `.sig` as assets.
+  Use this for programs with their own repository and release cycle.
 - **Stored here:** run, from the PureC OS tree,
 
-      python3 mk/pkg/publish.py --registry Trusted bin/NAME/NAME-VERSION-REL-x86_64.pkg.tar.gz
+      python3 mk/pkg/publish.py --registry Trusted out/NAME-VERSION-REL-x86_64.pkg.tar.gz
 
   It copies the archive and its signature to `bin/NAME/`, removes the older
-  version, rewrites `repository.conf` and signs `repository.conf` and
-  `registry.conf`.
+  version, takes the description from `pkgdesc`, rewrites `repository.conf`
+  and signs `repository.conf` and `registry.conf`. Use the copy in
+  `mk/pkg/`, not `script/publish.py`, which is older.
 
-Before opening a pull request:
+A name in `repository.conf` wins over the same name in a release, so a package
+must not live in both places.
 
-- old versions are gone from `bin/`, and `repository.conf` lists only files
-  that exist, each with its `.sig`;
-- every line of `repository.conf` has a description;
-- `registry.conf` and `repository.conf` end with a valid `#sig` line (edit
-  them by hand only before signing; any later change breaks the signature).
+## Updating and removing packages
 
-Open an issue with the "Add or update a package" template, or a pull request
-that follows the same checklist.
+**Update:** publish the new archive with `publish.py`. It deletes the old
+archive and its `.sig`; check that nothing else of the old version is left in
+`bin/NAME/`.
+
+**Remove:**
+
+1. Delete `bin/NAME/`.
+2. Delete its line from `repository.conf`, or its URL from `registry.conf` if
+   the whole repository goes away.
+3. Re-sign both files (run `publish.py` with any current package, or sign them
+   by hand with `pkgsign.py`).
+4. Remove the row from the package table in README.md.
+
+Installed systems keep a removed package until the user removes it; they only
+stop getting updates.
+
+## Testing
+
+1. Install the archive directly on a running PureC OS:
+
+       pkg -U /root/hello-1.0.0-1-x86_64.pkg.tar.gz
+
+   Run the program, then `pkg -R hello` and check that nothing is left behind.
+2. Test the registry itself. Serve your checkout and point a test config at it
+   (see "Testing a change locally" in the README):
+
+       pkg --config /root/pkg.conf -Sy
+       pkg --config /root/pkg.conf -S hello
+
+   `-Sy` must accept both signatures; `-S` must download, verify and install.
+3. Upgrade test: with the previous version installed, `-Sy` and `-Su` must
+   move to the new one and keep files listed with `--backup`.
+
+## Checklist before a pull request
+
+- [ ] Every archive in `bin/` has its `.sig`, and only the current version is
+      there.
+- [ ] `repository.conf` lists only files that exist, each with a description.
+- [ ] `registry.conf` lists every repository that publishes through releases,
+      and only those.
+- [ ] Both `.conf` files end with a valid `#sig` line, checked with the public
+      key, not only written.
+- [ ] Renamed packages declare `conflict` with the old name, and the old name
+      is gone from the registry.
+- [ ] README.md package table matches the registry.
+- [ ] The package was installed and run on PureC OS.
+
+## Commits and pull requests
+
+- One logical change per commit: `Add NAME VERSION`, `Update NAME to VERSION`,
+  `Remove NAME`, `Docs: ...`.
+- The re-signed `.conf` files go in the same commit as the change that needed
+  them, so `main` never holds a file with a stale signature.
+- Do not commit build directories, logs, private keys or anything except
+  archives, signatures, the two `.conf` files and docs.
+- Do not include hardware identifiers (MAC addresses, serial numbers) in
+  commits, issues or logs you paste; mask them.
+- Pull requests target `main`. Describe what changed, the version, and how you
+  tested it.
+
+## Review
+
+A maintainer checks for every package change:
+
+- the archive and the source it was built from;
+- the file list and `.PKGINFO`;
+- the signatures of the archive and of both `.conf` files;
+- a test install on PureC OS.
+
+A new URL in `registry.conf` gets the strictest review: it lets the owner of
+that repository ship root code to every PureC OS machine through its releases.
+
+## Security
+
+If you find a package that is malicious, a signature that does not verify, or a
+way to make `pkg` accept something it should not, do not open a public issue.
+Contact the maintainers privately through GitHub (a private security advisory
+on this repository) and wait for a fix before publishing details.

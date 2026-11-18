@@ -17,12 +17,22 @@ lists it.
 |---|---|
 | `registry.conf` | Official repositories, one GitHub URL per line. Packages come from the assets of their releases. |
 | `repository.conf` | Packages stored in this repository: `NAME PATH DESCRIPTION`, the path is relative to the file. A name listed here wins over a release. |
+| `keyring.conf` | Keys that may sign: the official key, community keys bound to a repository and package names, revoked keys. Signed by the master keys. |
 | `bin/NAME/` | The archive `NAME-VERSION-REL-x86_64.pkg.tar.gz` and its signature `.sig`. |
 
 Both `.conf` files end with `#sig HEX`, the ECDSA signature of everything above
 it. The file and its signature travel together, so the five-minute cache of
 raw.githubusercontent.com never pairs a new file with an old signature. A file
 that does not match its signature is refused.
+
+## Community repositories
+
+`registry.conf` may also list `community https://github.com/OWNER/REPO`. These
+repositories are used only on systems with `AllowCommunity = yes`. A community
+key in `keyring.conf` is bound to its repository and to the package names it
+may sign, and official package names are reserved. To get a repository listed,
+send a pull request with the `community` line and a `key` line signed in by the
+maintainers; see [CONTRIBUTING.md](CONTRIBUTING.md#community-repositories).
 
 ## Packages
 

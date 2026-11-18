@@ -12,6 +12,7 @@ If you are an AI agent, also read [AGENTS.md](AGENTS.md).
 - [Building a package](#building-a-package)
 - [Signing](#signing)
 - [How a package gets in](#how-a-package-gets-in)
+- [Community repositories](#community-repositories)
 - [Updating and removing packages](#updating-and-removing-packages)
 - [Testing](#testing)
 - [Checklist before a pull request](#checklist-before-a-pull-request)
@@ -106,9 +107,18 @@ Only maintainers hold the private key. A maintainer signs with
     python3 mk/pkg/pkgsign.py sign ~/.config/purec-pkg/signing.pem \
         out/hello-1.0.0-1-x86_64.pkg.tar.gz out/hello-1.0.0-1-x86_64.pkg.tar.gz.sig
 
-Installed systems trust the public keys in `/etc/pkg/keys/`
-(`rootfs/etc/pkg/keys/purec.pub` in the PureC OS tree). A signature made with
-another key is refused.
+Installed systems trust the keys listed in `keyring.conf` of this repository.
+It is signed by the master keys (`/etc/pkg/keys/master/`), not by the registry
+key, and holds `serial N`, `key FP HEXPOINT official` for the PureC OS key,
+`key FP HEXPOINT repo=URL names=GLOBS` for community keys and
+`revoke FP` for withdrawn keys. Sign it with
+
+    python3 mk/pkg/pkgsign.py keyring-sign --key MASTER.pem keyring.conf
+    python3 mk/pkg/pkgsign.py keyring-verify --masters DIR keyring.conf
+
+and raise `serial` on every change; `pkg` refuses a lower serial. Without a
+keyring (old installations) the keys in `/etc/pkg/keys/` are trusted. A
+signature made with a key the keyring does not allow is refused.
 
 `registry.conf` and `repository.conf` carry their own signature on the last
 line (`#sig HEX`), over every byte above it. Any change to these files, even
@@ -130,6 +140,31 @@ whitespace, needs a new signature; `publish.py` does it.
 
 A name in `repository.conf` wins over the same name in a release, so a package
 must not live in both places.
+
+## Community repositories
+
+A third-party repository can be listed without becoming official. Its packages
+are installed only by users who set `AllowCommunity = yes`, and are marked
+`community` by `pkg`.
+
+To onboard a repository, open a pull request that adds
+
+1. the line `community https://github.com/OWNER/REPO` to `registry.conf`;
+2. a `key` line to `keyring.conf`, made by the maintainer of the repository
+   from the public half of their signing key:
+
+       python3 mk/pkg/pkgsign.py keyring-entry their.pub \
+           repo=https://github.com/OWNER/REPO names=tool,tool-*
+
+3. a new `serial` (one more than the current) in `keyring.conf`.
+
+The key is bound to that repository and to the package names matched by
+`names`; packages signed by it for any other repository or name are refused.
+Official names (everything in `repository.conf` and in the official
+repositories) are reserved: a community package with such a name is dropped.
+The maintainers sign the changed `keyring.conf` with the master key(s) and
+`registry.conf` with the registry key. To drop a repository, remove its lines
+and add `revoke FINGERPRINT reason` for its key.
 
 ## Updating and removing packages
 
@@ -173,6 +208,7 @@ stop getting updates.
 - [ ] `repository.conf` lists only files that exist, each with a description.
 - [ ] `registry.conf` lists every repository that publishes through releases,
       and only those.
+- [ ] `keyring.conf` has a higher `serial` when keys changed, and enough master `#sig` lines.
 - [ ] Both `.conf` files end with a valid `#sig` line, checked with the public
       key, not only written.
 - [ ] Renamed packages declare `conflict` with the old name, and the old name
